@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0
+psycopg[binary]
+pgvector
+alembic
+pydantic>=2
+pydantic-settings
+google-genai
+pytest
+httpx
