@@ -37,6 +37,9 @@ class ImageMetadata(Base):
     )
     subject: Mapped[str] = mapped_column(String(100))
     category: Mapped[str] = mapped_column(String(50), index=True)
+    visibility: Mapped[str] = mapped_column(
+        String(30), server_default="whole_subject"
+    )
     attributes: Mapped[list] = mapped_column(JSONB, default=list)
     caption: Mapped[str] = mapped_column(Text)
     confidence: Mapped[float] = mapped_column(Float)
