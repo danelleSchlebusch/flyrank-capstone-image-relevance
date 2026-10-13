@@ -4,6 +4,7 @@ from pathlib import Path
 
 from google import genai
 from google.genai import types
+from google.genai import errors as genai_errors
 from pydantic import ValidationError
 
 from app.config import settings
@@ -31,12 +32,26 @@ Rules:
 """
 
 
+def is_retryable_status(code: int) -> bool:
+    """Timeouts, rate limits and server-side errors are temporary; the rest are not."""
+    return code in (408, 429) or code >= 500
+
+
 class VisionError(Exception):
-    """The API call failed (network, quota, auth). Worth retrying."""
+    """The API call failed (network, quota, auth)."""
+
+    def __init__(self, message: str, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable
 
 
 class InvalidModelOutput(Exception):
     """The model answered, but not in the required shape. Never trusted."""
+
+    def __init__(self, message: str, input_tokens: int = 0, output_tokens: int = 0):
+        super().__init__(message)
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
 
 
 @dataclass(frozen=True)
@@ -56,7 +71,7 @@ class VisionResult:
 @lru_cache(maxsize=1)
 def _client() -> genai.Client:
     if not settings.gemini_api_key:
-        raise VisionError("GEMINI_API_KEY is not set in .env")
+        raise VisionError("GEMINI_API_KEY is not set in .env", retryable=False)
     return genai.Client(api_key=settings.gemini_api_key)
 
 
@@ -75,18 +90,32 @@ def analyze_image(path: Path) -> VisionResult:
                 temperature=0,
             ),
         )
-    except Exception as exc:  # network, quota, auth ...
-        raise VisionError(f"Gemini call failed: {exc}") from exc
+    except genai_errors.APIError as exc:
+        code = exc.code if isinstance(exc.code, int) else 0
+        raise VisionError(
+            f"Gemini call failed: {exc}", retryable=is_retryable_status(code)
+        ) from exc
+    except Exception as exc:  # network drop, timeout ...
+        raise VisionError(f"Gemini call failed: {exc}", retryable=True) from exc
+
+    usage = response.usage_metadata
+    input_tokens = (usage.prompt_token_count or 0) if usage else 0
+    # Gemini 3 models can "think" before answering; thinking tokens are billed as output.
+    output_tokens = (
+        ((usage.candidates_token_count or 0) + (getattr(usage, "thoughts_token_count", 0) or 0))
+        if usage else 0
+    )
 
     try:
         tags = ImageTags.model_validate_json(response.text or "")
     except ValidationError as exc:
-        raise InvalidModelOutput(f"Response failed schema validation: {exc}") from exc
+        raise InvalidModelOutput(
+            f"Response failed schema validation: {exc}", input_tokens, output_tokens
+        ) from exc
 
-    usage = response.usage_metadata
     return VisionResult(
         tags=tags,
         model=settings.vision_model,
-        input_tokens=(usage.prompt_token_count or 0) if usage else 0,
-        output_tokens=(usage.candidates_token_count or 0) if usage else 0,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
     )

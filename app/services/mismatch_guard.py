@@ -21,6 +21,7 @@ class ReasonCode(str, Enum):
     CATEGORY_MISMATCH = "category_mismatch"
     SUBJECT_MISMATCH = "subject_mismatch"
     LOW_CONFIDENCE = "low_confidence"
+    UNCLEAR_IMAGE = "unclear_image"
     LOW_SIMILARITY = "low_similarity"
 
 
@@ -158,14 +159,16 @@ def evaluate_match(
             f"expected {expected}, detected {detected}",
         ))
 
-    if (
-        image.validation_status == "low_confidence"
-        or image.confidence < thresholds.min_confidence
-    ):
+    if image.confidence < thresholds.min_confidence:
         reasons.append(Reason(
             ReasonCode.LOW_CONFIDENCE,
             f"Low classification confidence: {image.confidence:.2f} "
             f"(minimum {thresholds.min_confidence:.2f})",
+        ))
+    elif image.validation_status == "low_confidence":
+        reasons.append(Reason(
+            ReasonCode.UNCLEAR_IMAGE,
+            "The image was flagged as unclear: no recognisable subject is visible",
         ))
 
     if similarity < thresholds.min_similarity:

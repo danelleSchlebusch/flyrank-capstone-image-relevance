@@ -63,7 +63,7 @@ def test_low_model_confidence_rejected():
 
 def test_flagged_image_rejected_even_if_confidence_number_is_high():
     result = evaluate_match(FOX_POST, img("red fox", status="low_confidence"), 0.91, T)
-    assert ReasonCode.LOW_CONFIDENCE in codes(result)
+    assert ReasonCode.UNCLEAR_IMAGE in codes(result)
 
 
 def test_unknown_post_subject_is_rejected_not_guessed():

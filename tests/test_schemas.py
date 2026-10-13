@@ -6,6 +6,7 @@ from app.schemas.image import ImageTags
 VALID = {
     "subject": " Red Fox ",
     "category": "animal",
+    "visibility": "whole_subject",
     "attributes": ["Orange fur", "wild"],
     "caption": "A red fox standing in a forest",
     "confidence": 0.94,
@@ -22,6 +23,7 @@ def test_valid_payload_is_accepted_and_normalised():
     ("category", "wildlife"),       # not in the fixed list
     ("confidence", 94),             # out of range (percent instead of 0-1)
     ("confidence", -0.1),
+    ("visibility", "blurry"),
     ("attributes", []),             # empty
     ("subject", ""),
     ("caption", "hi"),              # too short
