@@ -35,7 +35,7 @@
 | 27 | giraffes.jpg | Eduard Delputte | https://unsplash.com/photos/three-giraffes-in-golden-savanna-8mfRDTuP8bc |
 | 28 | gorilla.jpg | Peter Barrett Bryan | https://unsplash.com/photos/a-thoughtful-portrait-of-a-gorilla-in-black-and-white-WGi0CBoOQNQ |
 | 29 | hair.jpg | Berke Can | https://unsplash.com/photos/a-close-up-of-a-black-and-brown-fur-texture-w9q82GEGH6s |
-| 30 | hawk.jpg | Spenser Sembrat | https://unsplash.com/photos/a-close-up-of-a-golden-eagle-with-its-beak-open-ISSZhD0PeQg |
+| 30 | hawk.jpg <!-- shows a golden eagle --> | Spenser Sembrat | https://unsplash.com/photos/a-close-up-of-a-golden-eagle-with-its-beak-open-ISSZhD0PeQg |
 | 31 | hippo.jpg | Bob Brewer | https://unsplash.com/photos/hippopotamus-with-mouth-open-in-river-vl78jEP0k4g |
 | 32 | horse.jpg | Komorebi Photo | https://unsplash.com/photos/close-up-of-a-brown-horses-eye-and-mane-ImTjZeboc-g |
 | 33 | house.jpg | Caroline Badran | https://unsplash.com/photos/modern-house-with-glass-gable-front-u5Y1iCI8DyI |

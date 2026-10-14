@@ -36,6 +36,7 @@ def tag_image(db: Session, image: Image) -> Image:
     image.meta = ImageMetadata(
         subject=tags.subject,
         category=tags.category,
+        aliases=tags.aliases,
         visibility=tags.visibility,
         attributes=tags.attributes,
         caption=tags.caption,

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
-    DateTime, Float, ForeignKey, Index, String, Text, UniqueConstraint, func, Integer,
+    DateTime, Float, ForeignKey, Index, String, Text, UniqueConstraint, func, Integer, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -39,6 +39,9 @@ class ImageMetadata(Base):
     )
     subject: Mapped[str] = mapped_column(String(100))
     category: Mapped[str] = mapped_column(String(50), index=True)
+    aliases: Mapped[list] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
     visibility: Mapped[str] = mapped_column(
         String(30), server_default="whole_subject"
     )

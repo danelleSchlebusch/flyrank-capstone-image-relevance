@@ -8,6 +8,7 @@ Everything it needs is passed in, so it can be tested in isolation.
 import re
 from dataclasses import dataclass
 from enum import Enum
+from collections.abc import Iterable
 
 
 class Decision(str, Enum):
@@ -41,6 +42,7 @@ class ImageProfile:
     category: str
     confidence: float
     validation_status: str = "valid"  # "valid" | "low_confidence"
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -109,14 +111,28 @@ def _singular(word: str) -> str:
     return word
 
 
-def head_noun(subject: str) -> str:
-    """
-    Reduce a subject to its core noun, so 'red fox', 'Red Foxes' and 'fox'
-    all compare equal, while 'gray wolf' stays different.
-    """
-    words = re.findall(r"[a-z]+", subject.lower())
-    return _singular(words[-1]) if words else ""
+def normalize_name(name: str) -> str:
+    """Lowercase, split hyphens, and singularise the last word:
+    'Red Foxes' -> 'red fox', 'bee-eater' -> 'bee eater'."""
+    words = re.findall(r"[a-z0-9]+", name.lower().replace("-", " "))
+    if not words:
+        return ""
+    words[-1] = _singular(words[-1])
+    return " ".join(words)
 
+
+def _contains_phrase(haystack: str, needle: str) -> bool:
+    return f" {needle} " in f" {haystack} "
+
+
+def subject_matches(expected: str, image_names: Iterable[str]) -> bool:
+    """True if the post's subject appears, as whole words, in one of the image's names:
+    'fox' matches 'arctic fox'; 'black bear' matches 'black bear cub';
+    'red fox' does not match 'arctic fox'."""
+    wanted = normalize_name(expected)
+    if not wanted:
+        return False
+    return any(_contains_phrase(normalize_name(name), wanted) for name in image_names)
 
 def _clean(text: str) -> str:
     return text.strip().lower()
@@ -131,11 +147,10 @@ def evaluate_match(
     thresholds: GuardThresholds,
 ) -> GuardResult:
     reasons: list[Reason] = []
+    expected_subject = (post.expected_subject or "").strip()
+    has_subject = bool(normalize_name(expected_subject))
 
-    expected = head_noun(post.expected_subject or "")
-    detected = head_noun(image.subject)
-
-    if not expected:
+    if not has_subject:
         reasons.append(Reason(
             ReasonCode.MISSING_POST_SUBJECT,
             "The post's subject could not be determined, so the image cannot be verified",
@@ -152,11 +167,13 @@ def evaluate_match(
 
     # Only compare subjects when the category already matches; otherwise
     # the category reason already explains the problem.
-    if expected and category_ok and expected != detected:
+    if has_subject and category_ok and not subject_matches(
+        expected_subject, (image.subject, *image.aliases)
+    ):
         reasons.append(Reason(
             ReasonCode.SUBJECT_MISMATCH,
             f"{_clean(image.category).capitalize()} category mismatch: "
-            f"expected {expected}, detected {detected}",
+            f"expected {_clean(expected_subject)}, detected {_clean(image.subject)}",
         ))
 
     if image.confidence < thresholds.min_confidence:
@@ -179,7 +196,6 @@ def evaluate_match(
         ))
 
     return GuardResult(reasons=tuple(reasons))
-
 
 def select_best(
     post: PostProfile,

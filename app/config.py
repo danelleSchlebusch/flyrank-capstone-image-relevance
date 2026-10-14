@@ -24,5 +24,11 @@ class Settings(BaseSettings):
     job_delay_seconds: float = 1.0
     job_max_consecutive_failures: int = 3
 
+    embedding_model: str = "gemini-embedding-001"
+    embedding_price_per_m: float = 0.0
+
+    text_model: str = "gemini-3.1-flash-lite"
+    match_top_k: int = 10
+
 
 settings = Settings()

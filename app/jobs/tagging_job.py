@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -23,6 +23,39 @@ def _now() -> datetime:
 
 def _statuses(retry_failed: bool) -> list[str]:
     return ["pending", "failed"] if retry_failed else ["pending"]
+
+def recover_interrupted(db: Session) -> dict[str, int]:
+    """Clean up what a crashed run leaves behind.
+
+    Assumes ONE worker at a time. If we ever run several jobs in parallel,
+    this must be replaced with a heartbeat check.
+    """
+    stuck_images = db.execute(
+        update(Image).where(Image.status == "processing").values(status="pending")
+    ).rowcount
+    stale_jobs = db.execute(
+        update(Job).where(Job.status == "running").values(
+            status="stopped",
+            stop_reason="Interrupted: the process crashed or lost its database connection",
+            finished_at=_now(),
+        )
+    ).rowcount
+    db.commit()
+    return {"images_reset": stuck_images, "jobs_closed": stale_jobs}
+
+
+def _record_crash(job_id: int, exc: Exception) -> None:
+    """Best effort: use a fresh session, because the old one may be broken."""
+    try:
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            job.status = "stopped"
+            job.stop_reason = f"Crashed: {type(exc).__name__}: {str(exc)[:300]}"
+            job.finished_at = _now()
+            db.commit()
+    except Exception:
+        log.error("Could not record the crash (database unreachable); "
+                  "recover_interrupted() will clean up on the next run")
 
 
 def create_job(db: Session, retry_failed: bool = False) -> Job:
@@ -85,30 +118,36 @@ def run_tagging_job(job_id: int, retry_failed: bool = False) -> None:
         stop_reason = None
         consecutive_failures = 0
 
-        for position, image_id in enumerate(image_ids, start=1):
-            if _over_budget(db):
-                stop_reason = f"Daily budget of ${settings.daily_budget_usd} reached"
-                break
-            if consecutive_failures >= settings.job_max_consecutive_failures:
-                stop_reason = (f"{consecutive_failures} images failed in a row; "
-                               "stopping to avoid wasting calls")
-                break
+        try:
+            for position, image_id in enumerate(image_ids, start=1):
+                if _over_budget(db):
+                    stop_reason = f"Daily budget of ${settings.daily_budget_usd} reached"
+                    break
+                if consecutive_failures >= settings.job_max_consecutive_failures:
+                    stop_reason = (f"{consecutive_failures} images failed in a row; "
+                                   "stopping to avoid wasting calls")
+                    break
 
-            image = db.get(Image, image_id)
-            outcome = _process_one(db, image)
-            log.info("[%d/%d] %s -> %s", position, len(image_ids), image.filename, outcome)
+                image = db.get(Image, image_id)
+                outcome = _process_one(db, image)
+                log.info("[%d/%d] %s -> %s", position, len(image_ids), image.filename, outcome)
 
-            if outcome == "failed":
-                job.failed += 1
-                consecutive_failures += 1
-            else:
-                consecutive_failures = 0
-                if outcome == "flagged":
-                    job.flagged += 1
+                if outcome == "failed":
+                    job.failed += 1
+                    consecutive_failures += 1
                 else:
-                    job.succeeded += 1
-            db.commit()
-            time.sleep(settings.job_delay_seconds)
+                    consecutive_failures = 0
+                    if outcome == "flagged":
+                        job.flagged += 1
+                    else:
+                        job.succeeded += 1
+                db.commit()
+                time.sleep(settings.job_delay_seconds)
+        except Exception as exc:
+            log.exception("Job %d crashed", job_id)
+            db.rollback()
+            _record_crash(job_id, exc)
+            raise
 
         job.status = "stopped" if stop_reason else "completed"
         job.stop_reason = stop_reason

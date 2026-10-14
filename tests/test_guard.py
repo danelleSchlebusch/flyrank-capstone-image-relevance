@@ -1,14 +1,14 @@
 from app.services.mismatch_guard import (
     Candidate, Decision, GuardThresholds, ImageProfile, PostProfile,
-    ReasonCode, evaluate_match, head_noun, select_best,
+    ReasonCode, evaluate_match, normalize_name, select_best, subject_matches,
 )
 
 T = GuardThresholds(min_similarity=0.70, min_confidence=0.60)
 FOX_POST = PostProfile(expected_subject="fox", expected_category="animal")
 
 
-def img(subject, category="animal", confidence=0.94, status="valid"):
-    return ImageProfile(subject, category, confidence, status)
+def img(subject, category="animal", confidence=0.94, status="valid", aliases=()):
+    return ImageProfile(subject, category, confidence, status, tuple(aliases))
 
 
 def codes(result):
@@ -17,11 +17,26 @@ def codes(result):
 
 # ----- head_noun -----
 
-def test_head_noun_ignores_modifiers_and_plurals():
-    assert head_noun("red fox") == "fox"
-    assert head_noun("Red Foxes") == "fox"
-    assert head_noun("gray wolf") == "wolf"
-    assert head_noun("wolves") == "wolf"
+def test_normalize_name_handles_case_plurals_and_hyphens():
+    assert normalize_name("Red Foxes") == "red fox"
+    assert normalize_name("wolves") == "wolf"
+    assert normalize_name("bee-eater") == "bee eater"
+
+
+def test_specific_post_rejects_a_different_species():
+    assert not subject_matches("red fox", ["arctic fox"])
+    assert not subject_matches("fox", ["gray wolf"])
+
+
+def test_generic_post_matches_any_kind_of_that_animal():
+    assert subject_matches("fox", ["arctic fox"])      # documented behaviour
+
+
+def test_alias_lets_a_general_post_find_a_specific_image():
+    cub = img("black bear cub", aliases=["bear"])
+    pup = img("golden retriever puppy", aliases=["dog"])
+    assert evaluate_match(PostProfile("bear", "animal"), cub, 0.9, T).reasons == ()
+    assert evaluate_match(PostProfile("dog", "animal"), pup, 0.9, T).reasons == ()
 
 
 # ----- evaluate_match -----
@@ -36,7 +51,7 @@ def test_wolf_rejected_for_fox_post_even_with_high_similarity():
     result = evaluate_match(FOX_POST, img("gray wolf"), 0.88, T)
     assert result.decision == Decision.REJECTED
     assert codes(result) == [ReasonCode.SUBJECT_MISMATCH]
-    assert "expected fox, detected wolf" in result.explanation
+    assert "expected fox, detected gray wolf" in result.explanation
 
 
 def test_generic_dog_rejected_for_fox_post():
@@ -105,3 +120,7 @@ def test_no_confident_match_when_nothing_passes():
 def test_no_candidates_at_all():
     selection = select_best(FOX_POST, [], T)
     assert selection.decision == Decision.NO_CONFIDENT_MATCH
+
+def test_phrase_can_appear_inside_a_longer_name():
+    assert subject_matches("black bear", ["black bear cub"])
+    assert not subject_matches("red fox", ["arctic fox"])

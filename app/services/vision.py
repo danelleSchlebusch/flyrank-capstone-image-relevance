@@ -18,6 +18,10 @@ Describe the main subject of this image.
 Rules:
 - subject: the most specific common English name of the main subject
   (e.g. "red fox", "gray wolf", "african wild dog"). Never use Latin names.
+- aliases: 0 to 4 other names that are TRUE of this exact subject: broader everyday
+  names (e.g. "dog" for a golden retriever puppy, "bird" for a dunlin, "bear" for a
+  black bear cub, "car" for a Rover SD1) and common short forms (e.g. "hippo" for
+  hippopotamus). Never list a different species or a different kind of thing.
 - category: exactly one of: animal, vehicle, building, furniture, electronics, other.
 - visibility: exactly one of:
     whole_subject        - the entire subject is visible and recognisable

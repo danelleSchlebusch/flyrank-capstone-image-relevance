@@ -37,3 +37,28 @@ def spent_today(db: Session) -> Decimal:
         select(func.coalesce(func.sum(AiUsage.cost), 0)).where(AiUsage.created_at >= start)
     )
     return Decimal(str(total))
+
+def record_embedding_usage(db: Session, model: str, item_id: int, text: str) -> None:
+    """The embedding API doesn't report token counts here, so this is an estimate
+    (about 4 characters per token). It's labelled as such in the README."""
+    tokens = max(1, len(text) // 4)
+    cost = Decimal(tokens) * Decimal(str(settings.embedding_price_per_m)) / Decimal(1_000_000)
+    db.add(AiUsage(
+        operation="embedding",
+        model=model,
+        item_id=item_id,
+        tokens_or_units=tokens,
+        cost=cost,
+    ))
+
+def record_text_usage(
+    db: Session, model: str, item_id: int, input_tokens: int, output_tokens: int
+) -> None:
+    # Same model family and prices as vision; split the settings if that ever changes.
+    db.add(AiUsage(
+        operation="text",
+        model=model,
+        item_id=item_id,
+        tokens_or_units=input_tokens + output_tokens,
+        cost=estimate_vision_cost(input_tokens, output_tokens),
+    ))
