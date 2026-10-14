@@ -191,8 +191,8 @@ def evaluate_match(
     if similarity < thresholds.min_similarity:
         reasons.append(Reason(
             ReasonCode.LOW_SIMILARITY,
-            f"Similarity {similarity:.2f} is below the threshold "
-            f"{thresholds.min_similarity:.2f}",
+            f"Similarity {similarity:.3f} is below the threshold "
+            f"{thresholds.min_similarity:.3f}",
         ))
 
     return GuardResult(reasons=tuple(reasons))

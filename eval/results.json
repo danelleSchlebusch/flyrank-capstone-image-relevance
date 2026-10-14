@@ -1,0 +1,11 @@
+{
+  "threshold": 0.55,
+  "answerable": 16,
+  "unanswerable": 4,
+  "correct": 15,
+  "missed": 1,
+  "wrong": 0,
+  "refused_ok": 3,
+  "false_accept": 1,
+  "top1_precision": 0.938
+}
