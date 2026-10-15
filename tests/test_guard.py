@@ -124,3 +124,10 @@ def test_no_candidates_at_all():
 def test_phrase_can_appear_inside_a_longer_name():
     assert subject_matches("black bear", ["black bear cub"])
     assert not subject_matches("red fox", ["arctic fox"])
+
+def test_select_best_evaluates_every_candidate():
+    ranked = [Candidate(2, img("red fox"), 0.84), Candidate(1, img("gray wolf"), 0.80)]
+    selection = select_best(FOX_POST, ranked, T)
+    assert selection.chosen.image_id == 2
+    assert len(selection.evaluations) == 2
+    assert selection.evaluations[1][1].decision == Decision.REJECTED

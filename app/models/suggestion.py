@@ -1,9 +1,14 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Float, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.image import Image
+    from app.models.review import Review
 
 
 class Suggestion(Base):
@@ -20,7 +25,7 @@ class Suggestion(Base):
         ForeignKey("images.id", ondelete="CASCADE"), index=True
     )
     similarity_score: Mapped[float] = mapped_column(Float)
-    # suggested | rejected
+    # suggested | alternative | rejected
     decision: Mapped[str] = mapped_column(String(20), index=True)
     reason: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(

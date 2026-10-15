@@ -57,6 +57,7 @@ class Candidate:
     image_id: int
     image: ImageProfile
     similarity: float
+    filename: str = ""
 
 
 # ---------- Outputs ----------
@@ -202,21 +203,14 @@ def select_best(
     ranked_candidates: list[Candidate],
     thresholds: GuardThresholds,
 ) -> GuardSelection:
-    """
-    Walk the ranked list from best to worst and return the first candidate
-    that passes the guard. If none passes, answer 'no confident match'.
-    """
-    evaluations = []
-    for candidate in ranked_candidates:
-        result = evaluate_match(post, candidate.image, candidate.similarity, thresholds)
-        evaluations.append((candidate, result))
+    """Judge every candidate, then pick the best-ranked one that passed."""
+    evaluations = tuple(
+        (c, evaluate_match(post, c.image, c.similarity, thresholds))
+        for c in ranked_candidates
+    )
+    for candidate, result in evaluations:
         if result.decision == Decision.SUGGESTED:
-            return GuardSelection(
-                decision=Decision.SUGGESTED,
-                chosen=candidate,
-                evaluations=tuple(evaluations),
-                explanation=result.explanation,
-            )
+            return GuardSelection(Decision.SUGGESTED, candidate, evaluations, result.explanation)
 
     if not evaluations:
         explanation = "No candidate images are available."
@@ -226,9 +220,4 @@ def select_best(
             f"No confident match. The top-ranked image (id {top.image_id}) "
             f"was rejected: {top_result.explanation}"
         )
-    return GuardSelection(
-        decision=Decision.NO_CONFIDENT_MATCH,
-        chosen=None,
-        evaluations=tuple(evaluations),
-        explanation=explanation,
-    )
+    return GuardSelection(Decision.NO_CONFIDENT_MATCH, None, evaluations, explanation)
