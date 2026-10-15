@@ -30,5 +30,7 @@ class Settings(BaseSettings):
     text_model: str = "gemini-3.1-flash-lite"
     match_top_k: int = 10
 
+    alert_webhook_url: str = ""
+
 
 settings = Settings()

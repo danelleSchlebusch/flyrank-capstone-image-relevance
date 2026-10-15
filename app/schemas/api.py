@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 ImageStatus = Literal["pending", "processing", "tagged", "flagged", "failed"]
 
@@ -24,6 +24,8 @@ class ImageOut(BaseModel):
     filename: str
     image_url: str
     status: ImageStatus
+    attempts: int
+    last_error: str | None
     metadata: ImageMetadataOut | None = Field(default=None, validation_alias="meta")
 
 
@@ -95,3 +97,79 @@ class CheckOut(BaseModel):
     explanation: str
     reasons: list[ReasonOut]
     thresholds: ThresholdsOut
+
+class ReviewIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    decision: Literal["approved", "rejected"]
+    comment: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("comment")
+    @classmethod
+    def blank_means_none(cls, v):
+        return v or None
+
+
+class ReviewOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    decision: str
+    comment: str | None
+    created_at: datetime
+
+
+class SuggestionOut(BaseModel):
+    id: int
+    post_id: int
+    image_id: int
+    filename: str
+    similarity_score: float
+    decision: Literal["suggested", "alternative", "rejected"]
+    reason: str                       # why the image was selected or refused
+    review_status: Literal["pending", "approved", "rejected"]
+    reviews: list[ReviewOut]
+
+
+class JobOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    type: str
+    status: str
+    total: int
+    succeeded: int
+    flagged: int
+    failed: int
+    stop_reason: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+    @computed_field
+    @property
+    def processed(self) -> int:
+        return self.succeeded + self.flagged + self.failed
+
+
+class UsageEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    operation: str
+    model: str
+    item_id: int | None
+    tokens_or_units: int
+    cost: float
+    created_at: datetime
+
+
+class UsageByOperation(BaseModel):
+    operation: str
+    calls: int
+    tokens: int
+    cost: float
+
+
+class UsageSummaryOut(BaseModel):
+    by_operation: list[UsageByOperation]
+    total_calls: int
+    total_cost: float
+    spent_today: float
+    daily_budget_usd: float
