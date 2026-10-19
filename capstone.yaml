@@ -1,0 +1,30 @@
+name: flyrank-capstone-image-relevance
+description: >
+  Tags an image library with a vision model, matches images to posts by meaning,
+  and refuses wrong matches (wolf on a fox post) with a human-readable explanation.
+
+run: docker compose up --build --wait
+seed: docker compose exec -T api python -m scripts.seed
+test: docker compose exec -T api python -m pytest -q
+eval: docker compose exec -T api python -m scripts.evaluate
+
+base_url: http://localhost:8000
+docs: /docs
+
+# GEMINI_API_KEY is only needed to tag images or create new posts. The seeded
+# demo data (tags, vectors, 20 posts, cost log) needs no key.
+env_file: .env.example
+
+endpoints:
+  - {method: GET,  path: /health,                purpose: liveness and database check}
+  - {method: GET,  path: /images,                purpose: images with validated tags; flagged ones included}
+  - {method: GET,  path: /posts,                 purpose: demo posts (post 1 = red fox, post 4 = penguin)}
+  - {method: GET,  path: /posts/1/images,        purpose: Probe 2 - ranked images, fox first, guard verdict on each}
+  - {method: POST, path: /posts/1/check,         purpose: Probe 3 - body {"filename":"wolf.jpg"}, rejected with a reason}
+  - {method: GET,  path: /posts/4/images,        purpose: Probe 4 - no confident match plus reasons}
+  - {method: GET,  path: /suggestions?post_id=1, purpose: why each image was selected or refused}
+  - {method: POST, path: /suggestions/{id}/review, purpose: approve or reject a suggestion}
+  - {method: GET,  path: /usage/summary,         purpose: Probe 6 - cost per operation}
+  - {method: GET,  path: /usage,                 purpose: Probe 6 - every AI call with model, item, cost}
+  - {method: POST, path: /jobs/process-images,   purpose: Probe 1 - background tagging and embedding job}
+  - {method: GET,  path: /jobs,                  purpose: job progress}
