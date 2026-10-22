@@ -1,6 +1,6 @@
 # Evidence
 
-One proof per requirement, with real output. Everything was run on Windows 11 with Python 3.14.6, Docker Desktop, PostgreSQL 16 with pgvector, and the Gemini free tier. The API runs on `http://localhost:8000`. Evidence was collected between 13 and 21 October 2026.
+One proof per requirement, with real output. Everything was run on Windows 11 with Python 3.14.6, Docker Desktop, PostgreSQL 16 with pgvector, and the Gemini free tier. The API runs on `http://localhost:8000`. Evidence was collected between 13 and 22 October 2026.
 
 ## Index
  
@@ -249,11 +249,34 @@ budget of $0.002 reached)
 failed (Daily budget of $0.002 reached)
 ```
 
-**Budget guard on `POST /posts`** (a request refused before any AI call is made). Run with `DAILY_BUDGET_USD=0.0000001` and `VISION_INPUT_PRICE_PER_M=1`, restart the API, then:
+**Budget guard on `POST /posts`** (a request refused before any AI call is made). To push today's recorded spend over the default $1.00 limit without spending anything, one **synthetic** usage row of $5.00 (model `demo-budget-row`) was inserted for the demonstration and deleted again afterwards:
+
+`docker exec -it image_matching_db psql -U capstone -d image_matching -c "INSERT INTO ai_usage (operation, model, item_id, tokens_or_units, cost) VALUES ('text', 'demo-budget-row', NULL, 0, 5.0);"`
+`'{"title":"Budget guard demonstration","content":"A perfectly valid post body that is long enough to pass validation."}' | Set-Content -Encoding ascii post.json`
 `curl.exe -i -X POST http://localhost:8000/posts -H "Content-Type: application/json" --data-binary "@post.json"`
 ```
+HTTP/1.1 429 Too Many Requests
+date: Thu, 22 Oct 2026 08:09:58 GMT
+server: uvicorn
+content-length: 86
+content-type: application/json
 
-PASTE HERE (expect HTTP/1.1 429 and a message about the daily AI budget)
+{"detail":"The daily AI budget of $1e-07 has been reached; try again after 00:00 UTC"}
+```
+
+`docker exec -it image_matching_db psql -U capstone -d image_matching -c "DELETE FROM ai_usage WHERE model = 'demo-budget-row';"`
+`Remove-Item post.json`
+```
+DELETE 1
+```
+
+the `spend_daily` value should now be reset to 0:
+`Invoke-RestMethod http://localhost:8000/usage/summary | Select-Object spent_today, daily_budget_usd`
+```
+spent_today daily_budget_usd
+----------- ----------------
+        0.0              1.0
+
 ```
 
 and the automated version (`python -m pytest tests/test_api_budget.py -v`):
@@ -926,6 +949,8 @@ EVIDENCE.md
 LICENSE
 README.md
 capstone.yaml
+docs/design-document.md
+docs/design-one-page.md
 ```
 
 The design documents are `docs/design-one-page.md` (the one-page Phase 1 design) and `docs/design-document.md` (the full design as built, with the changes from the original plan).
