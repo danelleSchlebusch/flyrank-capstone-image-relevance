@@ -12,7 +12,7 @@ from app.database import SessionLocal
 from app.jobs.tagging_job import recover_interrupted
 from app.logging_setup import setup_logging
 from app.services.embeddings import EmbeddingError
-from app.services.errors import ConflictError, NotFoundError
+from app.services.errors import ConflictError, NotFoundError, BudgetExceededError
 from app.services.post_analysis import PostAnalysisError
 
 setup_logging()
@@ -72,6 +72,10 @@ async def database_down_handler(request: Request, exc: OperationalError):
 async def unhandled_handler(request: Request, exc: Exception):
     log.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
     return _error(500, "Internal server error")
+
+@app.exception_handler(BudgetExceededError)
+async def budget_handler(request: Request, exc: BudgetExceededError):
+    return _error(429, str(exc))
 
 
 @app.get("/health", tags=["system"])

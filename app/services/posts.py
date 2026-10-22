@@ -4,14 +4,18 @@ from app.config import settings
 from app.models import Post, PostVector
 from app.services.embeddings import QUERY, embed_text
 from app.services.post_analysis import analyze_post
-from app.services.usage import record_embedding_usage, record_text_usage
+from app.services.usage import ensure_within_budget, record_embedding_usage, record_text_usage
+
+MAX_POST_CHARS = 2000   # same cap as the design document
 
 
 def create_post(db: Session, title: str, content: str) -> Post:
     """Read the post, embed it, and save everything in ONE transaction.
     If either AI call fails, nothing is saved."""
-    analysis = analyze_post(title, content)
-    text = f"{title}\n\n{content}"
+    ensure_within_budget(db)
+    excerpt = content[:MAX_POST_CHARS]
+    analysis = analyze_post(title, excerpt)
+    text = f"{title}\n\n{excerpt}"
     vector = embed_text(text, QUERY)
 
     post = Post(

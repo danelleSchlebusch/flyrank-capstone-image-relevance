@@ -57,3 +57,12 @@ def test_fox_post_ranks_the_fox_first():
     assert body["decision"] == "suggested"
     assert body["candidates"][0]["filename"] == "fox.jpg"
     assert body["suggested_image"]["filename"] == "fox.jpg"
+
+def test_without_the_fox_nothing_else_passes_the_guard():
+    post_id = _post_id("How red foxes survive the winter")
+    if post_id is None:
+        pytest.skip("run scripts.evaluate first to create the demo posts")
+    body = client.get(f"/posts/{post_id}/images").json()
+    others = [c for c in body["candidates"] if c["filename"] != "fox.jpg"]
+    assert others and not any(c["guard_passed"] for c in others)
+    assert any(c["similarity"] >= body["thresholds"]["min_similarity"] for c in others)

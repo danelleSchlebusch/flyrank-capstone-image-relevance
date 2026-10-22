@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import AiUsage
+from app.services.errors import BudgetExceededError
 
 from datetime import datetime, timezone
 
@@ -62,3 +63,11 @@ def record_text_usage(
         tokens_or_units=input_tokens + output_tokens,
         cost=estimate_vision_cost(input_tokens, output_tokens),
     ))
+
+def ensure_within_budget(db: Session) -> None:
+    limit = Decimal(str(settings.daily_budget_usd))
+    if limit > 0 and spent_today(db) >= limit:
+        raise BudgetExceededError(
+            f"The daily AI budget of ${settings.daily_budget_usd} has been reached; "
+            "try again after 00:00 UTC"
+        )
